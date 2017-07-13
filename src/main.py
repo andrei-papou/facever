@@ -19,7 +19,7 @@ def main():
         num_epochs=200,
         embedding_dimension=64,
         mini_batch_size=50,
-        learning_rate=0.01,
+        learning_rate=0.0001,
         margin=0.5,
         monitor_training_loss=True,
         monitor_training_accuracy=True)

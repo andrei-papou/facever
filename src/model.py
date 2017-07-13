@@ -19,7 +19,7 @@ class Model:
                 self.net_vars_created = True
 
             inputs = tf.reshape(inputs_ph, [-1, self.width, self.height, 1])
-            weights_init = random_normal_initializer(mean=0.0, stddev=0.05)
+            weights_init = random_normal_initializer(mean=0.0, stddev=0.1)
 
             # returns 60 x 60 x 15
             net = tf.layers.conv2d(
@@ -54,14 +54,16 @@ class Model:
             net = tf.reshape(net, [-1, 1 * 1 * 250])
             net = tf.layers.dense(
                 inputs=net,
-                units=embedding_dimension,
+                units=256,
                 kernel_initializer=weights_init,
-                activation=tf.nn.relu)
+                activation=tf.nn.sigmoid)
             net = tf.layers.dense(
                 inputs=net,
                 units=embedding_dimension,
                 kernel_initializer=weights_init,
-                activation=tf.nn.relu)
+                activation=tf.nn.sigmoid)
+
+            net = tf.check_numerics(net, message='model')
 
         return net
 
@@ -69,8 +71,7 @@ class Model:
     def _get_loss_op(output1, output2, labels, margin):
         labels = tf.to_float(labels)
         d_sqr = compute_euclidian_distance_square(output1, output2)
-        d = tf.sqrt(d_sqr)
-        loss_non_reduced = labels * d_sqr + (1 - labels) * tf.square(tf.maximum(0., margin - d))
+        loss_non_reduced = labels * d_sqr + (1 - labels) * tf.square(tf.maximum(0., margin - d_sqr))
         return 0.5 * tf.reduce_mean(tf.cast(loss_non_reduced, dtype=tf.float64))
 
     @staticmethod
@@ -114,10 +115,11 @@ class Model:
         output2 = self._get_output_ten(input2_ph, embedding_dimension)
 
         loss = self._get_loss_op(output1, output2, labels_ph, margin)
+        loss = tf.Print(loss, [loss], message='loss')
         global_step = tf.Variable(initial_value=0, trainable=False, name='global_step')
         train_op = tf.train.GradientDescentOptimizer(learning_rate).minimize(loss, global_step=global_step)
 
-        num_batches = math.ceil(ys.shape[0] / mini_batch_size)
+        num_batches = int(math.ceil(ys.shape[0] / mini_batch_size))
 
         with tf.Session() as sess:
             sess.run(tf.global_variables_initializer())
