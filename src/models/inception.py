@@ -2,7 +2,7 @@ import tensorflow as tf
 from tensorflow.python.ops.init_ops import random_normal_initializer
 
 
-weights_init = random_normal_initializer(mean=0.0, stddev=0.001)
+weights_init = random_normal_initializer(mean=0.0, stddev=0.1)
 
 
 def block_5x5(inputs, filters=32):

@@ -33,7 +33,7 @@ def get_data(subset, data_directory=DATA_DIRECTORY):
         x1s_pre.append(img1)
         x2s_pre.append(img2)
 
-    x1s_pre, x2s_pre, ys_pre = unison_shuffle([x1s_pre, x2s_pre, ys_pre], len(ys_pre))
+    x1s_pre, x2s_pre, ys_pre = unison_shuffle([np.array(x1s_pre), np.array(x2s_pre), np.array(ys_pre)], len(ys_pre))
 
     x1s, x2s, ys = [], [], []
     for (i1, i2, label) in zip(x1s_pre, x2s_pre, ys_pre):
