@@ -3,6 +3,7 @@ import numpy as np
 from scipy.ndimage import rotate, shift
 from sklearn.datasets.lfw import fetch_lfw_pairs
 from config import DATA_DIRECTORY
+from utils import unison_shuffle
 
 
 ROTATIONS_RANGE = range(1, 9)
@@ -27,10 +28,17 @@ def get_data(subset, data_directory=DATA_DIRECTORY):
         ys = np.load(ys_path)
         return x1s, x2s, ys
 
+    x1s_pre, x2s_pre, ys_pre = [], [], train_data.target
+    for (img1, img2) in train_data.pairs:
+        x1s_pre.append(img1)
+        x2s_pre.append(img2)
+
+    x1s_pre, x2s_pre, ys_pre = unison_shuffle([x1s_pre, x2s_pre, ys_pre], len(ys_pre))
+
     x1s, x2s, ys = [], [], []
-    for (pair, label) in zip(train_data.pairs, train_data.target):
-        img1 = pad_img(pair[0])
-        img2 = pad_img(pair[1])
+    for (i1, i2, label) in zip(x1s_pre, x2s_pre, ys_pre):
+        img1 = pad_img(i1)
+        img2 = pad_img(i2)
 
         # original images
         x1s.append(img1)

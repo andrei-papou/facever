@@ -49,7 +49,7 @@ class Model:
         output1 = self._get_output_ten(input1_ph, embedding_dimension)
         output2 = self._get_output_ten(input2_ph, embedding_dimension)
 
-        num_batches = math.ceil(dataset_size / mini_batch_size)
+        num_batches = int(math.ceil(dataset_size / mini_batch_size))
 
         training_loss = 0
         validation_loss = 0
@@ -81,13 +81,15 @@ class Model:
         print('Validation loss:     {}'.format(validation_loss / num_batches))
         training_accuracy = training_correctly_predicted / dataset_size
         validation_accuracy = validation_correctly_predicted / dataset_size
-        print('Same: {}'.format(sum(ys_trn)))
+        print('Same percent:        {}'.format(sum(ys_trn) / len(ys_trn)))
         print('Training accuracy:   {}'.format(training_accuracy))
         print('Validation accuracy: {}'.format(validation_accuracy))
+        print('')  # new line
 
-        if validation_accuracy > self.best_accuracy:
+        # TODO: move from training accuracy to validation accuracy if everything goes well
+        if training_accuracy > self.best_accuracy:
             self._save(sess)
-            self.best_accuracy = validation_accuracy
+            self.best_accuracy = training_accuracy
 
     def _load_or_initialize(self, sess):
         if self.saved_model_path is None:
