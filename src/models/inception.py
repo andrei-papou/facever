@@ -95,7 +95,8 @@ def inception(inputs, embedding_size=64):
 
     # 3 x 3 x 64
     net = tf.reshape(net, [-1, 3 * 3 * 64])
-    net = tf.layers.dense(net, units=96, activation=tf.nn.relu, kernel_initializer=weights_init)
+    net = tf.layers.dense(net, units=512, activation=tf.nn.relu, kernel_initializer=weights_init)
+    net = tf.layers.dropout(net, rate=0.5)
     end_points['dense1'] = net
     net = tf.layers.dense(net, units=embedding_size, activation=tf.nn.relu, kernel_initializer=weights_init)
     end_points['dense2'] = net

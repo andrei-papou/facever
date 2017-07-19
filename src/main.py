@@ -22,19 +22,19 @@ def parse_arguments(argv):
 def main(args):
     np.random.seed()
 
-    x1s_training, x2s_training, ys_training = get_data(subset='train')
+    x1s_trn, x2s_trn, ys_trn, x1s_vld, x2s_vld, ys_vld = get_data()
     model = Model(64, 64, 1, model_id=args.model_id)
     model.train(
-        x1s=x1s_training[TRAINING_DATA_SLICE],
-        x2s=x2s_training[TRAINING_DATA_SLICE],
-        ys=ys_training[TRAINING_DATA_SLICE],
-        validation_x1s=x1s_training[VALIDATION_DATA_SLICE],
-        validation_x2s=x2s_training[VALIDATION_DATA_SLICE],
-        validation_ys=ys_training[VALIDATION_DATA_SLICE],
+        x1s=x1s_trn,
+        x2s=x2s_trn,
+        ys=ys_trn,
+        validation_x1s=x1s_vld,
+        validation_x2s=x2s_vld,
+        validation_ys=ys_vld,
         num_epochs=2000,
         embedding_dimension=128,
         mini_batch_size=50,
-        learning_rate=0.001,
+        learning_rate=0.00035,
         margin=0.5)
 
 

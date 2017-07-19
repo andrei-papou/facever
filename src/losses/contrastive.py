@@ -29,3 +29,10 @@ def contrastive_loss(margin, threshold=1e-5):
         return tf.reduce_mean(similar_part + different_part) / 2
 
     return forward
+
+
+def contrastive_loss_caffe(out1, out2, labels, margin):
+    distance = compute_euclidian_distance_square(out1, out2)
+    positive_part = labels * distance
+    negative_part = (1 - labels) * tf.maximum(tf.square(margin) - distance, 0.0)
+    return tf.reduce_mean(positive_part + negative_part) / 2

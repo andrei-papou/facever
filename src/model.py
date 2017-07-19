@@ -1,7 +1,8 @@
 import math
 import tensorflow as tf
 from models.inception import inception
-from losses.contrastive import contrastive_loss
+from models.chopra import chopra
+from losses.contrastive import contrastive_loss, contrastive_loss_caffe
 from utils import compute_euclidian_distance_square, unison_shuffle, generate_model_id, get_model_file_path
 from config import TRAINING_EVAL_DATA_SLICE
 
@@ -24,13 +25,13 @@ class Model:
                 self.net_vars_created = True
 
             inputs = tf.reshape(inputs_ph, [-1, self.width, self.height, 1])
-            net = inception(inputs, embedding_dimension)
+            net = chopra(inputs, embedding_dimension)
             net = tf.check_numerics(net, message='model')
         return net
 
     @staticmethod
     def _get_loss_op(output1, output2, labels, margin):
-        return contrastive_loss(margin)(output1, output2, labels)
+        return contrastive_loss_caffe(output1, output2, labels, margin=margin)
 
     @staticmethod
     def _get_accuracy_op(out1, out2, labels, margin):
@@ -39,9 +40,8 @@ class Model:
         predictions = tf.cast(gt_than_margin, dtype=tf.float32)
         return tf.reduce_sum(tf.cast(tf.not_equal(predictions, labels), dtype=tf.int32))
 
-    def _monitor(self, sess: tf.Session, x1s_trn, x2s_trn, ys_trn, x1s_vld, x2s_vld, ys_vld,
-                 margin, embedding_dimension, mini_batch_size):
-        dataset_size = ys_vld.shape[0]
+    def _monitor(self, sess: tf.Session, x1s, x2s, ys, margin, embedding_dimension, mini_batch_size, prefix):
+        dataset_size = ys.shape[0]
         input1_ph = tf.placeholder(dtype=tf.float32, shape=(mini_batch_size, self.width, self.height))
         input2_ph = tf.placeholder(dtype=tf.float32, shape=(mini_batch_size, self.width, self.height))
         labels_ph = tf.placeholder(dtype=tf.float32, shape=(mini_batch_size,))
@@ -51,45 +51,31 @@ class Model:
 
         num_batches = int(math.ceil(dataset_size / mini_batch_size))
 
-        training_loss = 0
-        validation_loss = 0
-        training_correctly_predicted = 0
-        validation_correctly_predicted = 0
+        loss = 0
+        correctly_predicted = 0
+
+        accuracy_ten = self._get_accuracy_op(output1, output2, labels_ph, margin)
+        batch_loss = tf.reduce_sum(self._get_loss_op(output1, output2, labels_ph, margin))
 
         for i in range(num_batches):
             bt_slice = slice(i * mini_batch_size, (i + 1) * mini_batch_size)
-            training_feed_dict = {
-                input1_ph: x1s_trn[bt_slice],
-                input2_ph: x2s_trn[bt_slice],
-                labels_ph: ys_trn[bt_slice]
+            feed_dict = {
+                input1_ph: x1s[bt_slice],
+                input2_ph: x2s[bt_slice],
+                labels_ph: ys[bt_slice]
             }
-            validation_feed_dict = {
-                input1_ph: x1s_vld[bt_slice],
-                input2_ph: x2s_vld[bt_slice],
-                labels_ph: ys_vld[bt_slice]
-            }
+            correctly_predicted += sess.run(accuracy_ten, feed_dict=feed_dict)
+            loss += sess.run(batch_loss, feed_dict=feed_dict)
 
-            accuracy_ten = self._get_accuracy_op(output1, output2, labels_ph, margin)
-            training_correctly_predicted += sess.run(accuracy_ten, feed_dict=training_feed_dict)
-            validation_correctly_predicted += sess.run(accuracy_ten, feed_dict=validation_feed_dict)
-
-            batch_loss = tf.reduce_sum(self._get_loss_op(output1, output2, labels_ph, margin))
-            training_loss += sess.run(batch_loss, feed_dict=training_feed_dict)
-            validation_loss += sess.run(batch_loss, feed_dict=validation_feed_dict)
-
-        print('Training loss:       {}'.format(training_loss / num_batches))
-        print('Validation loss:     {}'.format(validation_loss / num_batches))
-        training_accuracy = training_correctly_predicted / dataset_size
-        validation_accuracy = validation_correctly_predicted / dataset_size
-        print('Same percent:        {}'.format(sum(ys_trn) / len(ys_trn)))
-        print('Training accuracy:   {}'.format(training_accuracy))
-        print('Validation accuracy: {}'.format(validation_accuracy))
+        print('{} loss:       {}'.format(prefix, loss / num_batches))
+        accuracy = correctly_predicted / dataset_size
+        print('{} accuracy:   {}'.format(prefix, accuracy))
         print('')  # new line
 
         # TODO: move from training accuracy to validation accuracy if everything goes well
-        if training_accuracy > self.best_accuracy:
+        if prefix == 'Training' and accuracy > self.best_accuracy:
             self._save(sess)
-            self.best_accuracy = training_accuracy
+            self.best_accuracy = accuracy
 
     def _load_or_initialize(self, sess):
         if self.saved_model_path is None:
@@ -128,16 +114,25 @@ class Model:
 
                     sess.run(train_op, feed_dict=feed_dict)
                     # print('Batch {}/{} has been processed'.format(bt_num, num_batches))
+
                 print('Epoch {} training complete'.format(ep))
 
                 self._monitor(
                     sess=sess,
-                    x1s_trn=x1s[TRAINING_EVAL_DATA_SLICE],
-                    x2s_trn=x2s[TRAINING_EVAL_DATA_SLICE],
-                    ys_trn=ys[TRAINING_EVAL_DATA_SLICE],
-                    x1s_vld=validation_x1s,
-                    x2s_vld=validation_x2s,
-                    ys_vld=validation_ys,
+                    x1s=x1s,
+                    x2s=x2s,
+                    ys=ys,
                     margin=margin,
                     mini_batch_size=mini_batch_size,
-                    embedding_dimension=embedding_dimension)
+                    embedding_dimension=embedding_dimension,
+                    prefix='Training')
+
+                self._monitor(
+                    sess=sess,
+                    x1s=validation_x1s,
+                    x2s=validation_x2s,
+                    ys=validation_ys,
+                    margin=margin,
+                    mini_batch_size=mini_batch_size,
+                    embedding_dimension=embedding_dimension,
+                    prefix='Validation')
