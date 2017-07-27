@@ -4,7 +4,7 @@ from models.inception import inception
 from models.chopra import chopra
 from losses.contrastive import contrastive_loss, contrastive_loss_caffe
 from utils import compute_euclidian_distance_square, unison_shuffle, generate_model_id, get_model_file_path
-from config import TRAINING_EVAL_DATA_SLICE
+from data import DataProvider
 
 
 class Model:
@@ -41,7 +41,7 @@ class Model:
         return tf.reduce_sum(tf.cast(tf.not_equal(predictions, labels), dtype=tf.int32))
 
     def _monitor(self, sess: tf.Session, x1s, x2s, ys, margin, embedding_dimension, mini_batch_size, prefix):
-        dataset_size = ys.shape[0]
+        dataset_size = len(ys)
         input1_ph = tf.placeholder(dtype=tf.float32, shape=(mini_batch_size, self.width, self.height))
         input2_ph = tf.placeholder(dtype=tf.float32, shape=(mini_batch_size, self.width, self.height))
         labels_ph = tf.placeholder(dtype=tf.float32, shape=(mini_batch_size,))
@@ -88,8 +88,8 @@ class Model:
         saver = tf.train.Saver()
         saver.save(sess, self.model_path)
 
-    def train(self, x1s, x2s, ys, num_epochs, mini_batch_size, learning_rate, embedding_dimension, margin,
-              validation_x1s=None, validation_x2s=None, validation_ys=None):
+    def train(self, data_provider: DataProvider, num_epochs, mini_batch_size, learning_rate, embedding_dimension,
+              margin):
         input1_ph = tf.placeholder(dtype=tf.float32, shape=(mini_batch_size, self.width, self.height))
         input2_ph = tf.placeholder(dtype=tf.float32, shape=(mini_batch_size, self.width, self.height))
         labels_ph = tf.placeholder(dtype=tf.float32, shape=(mini_batch_size,))
@@ -100,39 +100,30 @@ class Model:
         global_step = tf.Variable(initial_value=0, trainable=False, name='global_step')
         train_op = tf.train.AdamOptimizer(learning_rate).minimize(loss, global_step=global_step)
 
-        num_batches = int(math.ceil(ys.shape[0] / mini_batch_size))
-
         with tf.Session() as sess:
             self._load_or_initialize(sess)
 
             for ep in range(num_epochs):
-                x1s, x2s, ys = unison_shuffle([x1s, x2s, ys], ys.shape[0])
-
-                for bt_num in range(num_batches):
-                    bt_slice = slice(bt_num * mini_batch_size, (bt_num + 1) * mini_batch_size)
-                    feed_dict = {input1_ph: x1s[bt_slice], input2_ph: x2s[bt_slice], labels_ph: ys[bt_slice]}
-
+                batches_processed = 0
+                for x1s, x2s, ys in data_provider.batches:
+                    batches_processed += 1
+                    feed_dict = {input1_ph: x1s, input2_ph: x2s, labels_ph: ys}
                     sess.run(train_op, feed_dict=feed_dict)
-                    # print('Batch {}/{} has been processed'.format(bt_num, num_batches))
+                    print('batched completed')
+
+                    if batches_processed > 20:
+                        batches_processed = 0
+                        x1s_vld, x2s_vld, ys_vld = data_provider.evaluation_data
+                        self._monitor(
+                            sess=sess,
+                            x1s=x1s_vld,
+                            x2s=x2s_vld,
+                            ys=ys_vld,
+                            margin=margin,
+                            mini_batch_size=mini_batch_size,
+                            embedding_dimension=embedding_dimension,
+                            prefix='Validation')
+                    else:
+                        batches_processed += 1
 
                 print('Epoch {} training complete'.format(ep))
-
-                self._monitor(
-                    sess=sess,
-                    x1s=x1s,
-                    x2s=x2s,
-                    ys=ys,
-                    margin=margin,
-                    mini_batch_size=mini_batch_size,
-                    embedding_dimension=embedding_dimension,
-                    prefix='Training')
-
-                self._monitor(
-                    sess=sess,
-                    x1s=validation_x1s,
-                    x2s=validation_x2s,
-                    ys=validation_ys,
-                    margin=margin,
-                    mini_batch_size=mini_batch_size,
-                    embedding_dimension=embedding_dimension,
-                    prefix='Validation')

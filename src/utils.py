@@ -2,7 +2,7 @@ import os
 from time import time
 import numpy as np
 import tensorflow as tf
-from config import DATA_DIRECTORY
+from constants import DATA_DIRECTORY
 
 
 def compute_euclidian_distance_square(x1, x2):
@@ -12,7 +12,7 @@ def compute_euclidian_distance_square(x1, x2):
 
 def unison_shuffle(arrays, perm_length):
     permutation = np.random.permutation(perm_length)
-    return [a[permutation] for a in arrays]
+    return [np.array(a)[permutation] for a in arrays]
 
 
 def generate_model_id():
