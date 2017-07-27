@@ -4,7 +4,6 @@ import numpy as np
 import tensorflow as tf
 from model import Model
 from data import get_data
-from config import TRAINING_DATA_SLICE, VALIDATION_DATA_SLICE
 
 
 tf.logging.set_verbosity(tf.logging.INFO)
@@ -22,8 +21,8 @@ def parse_arguments(argv):
 def main(args):
     np.random.seed()
 
-    x1s_trn, x2s_trn, ys_trn, x1s_vld, x2s_vld, ys_vld = get_data()
-    model = Model(64, 64, 1, model_id=args.model_id)
+    x1s_trn, x2s_trn, ys_trn, x1s_vld, x2s_vld, ys_vld = get_data(5)
+    model = Model(64, 64, 1, model_id=args.model_id, saved_model=args.saved_model)
     model.train(
         x1s=x1s_trn,
         x2s=x2s_trn,
@@ -34,7 +33,8 @@ def main(args):
         num_epochs=2000,
         embedding_dimension=128,
         mini_batch_size=50,
-        learning_rate=0.00035,
+        learning_rate=0.0001,
+        ep_to_stop=20,
         margin=0.5)
 
 

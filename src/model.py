@@ -4,7 +4,6 @@ from models.inception import inception
 from models.chopra import chopra
 from losses.contrastive import contrastive_loss, contrastive_loss_caffe
 from utils import compute_euclidian_distance_square, unison_shuffle, generate_model_id, get_model_file_path
-from config import TRAINING_EVAL_DATA_SLICE
 
 
 class Model:
@@ -18,6 +17,7 @@ class Model:
         self.model_path = get_model_file_path(model_id or generate_model_id())
         self.saved_model_path = get_model_file_path(saved_model) if saved_model is not None else None
         self.best_accuracy = 0
+        self.eps_no_improvement = 0
 
     def _get_output_ten(self, inputs_ph, embedding_dimension):
         with tf.variable_scope(self.var_scope, reuse=self.net_vars_created):
@@ -73,14 +73,19 @@ class Model:
         print('')  # new line
 
         # TODO: move from training accuracy to validation accuracy if everything goes well
-        if prefix == 'Training' and accuracy > self.best_accuracy:
-            self._save(sess)
-            self.best_accuracy = accuracy
+        if prefix == 'Validation':
+            if accuracy > self.best_accuracy:
+                self._save(sess)
+                self.best_accuracy = accuracy
+                self.eps_no_improvement = 0
+            else:
+                self.eps_no_improvement += 1
 
     def _load_or_initialize(self, sess):
         if self.saved_model_path is None:
             sess.run(tf.global_variables_initializer())
         else:
+            print(self.saved_model_path)
             saver = tf.train.Saver()
             saver.restore(sess, self.saved_model_path)
 
@@ -89,7 +94,7 @@ class Model:
         saver.save(sess, self.model_path)
 
     def train(self, x1s, x2s, ys, num_epochs, mini_batch_size, learning_rate, embedding_dimension, margin,
-              validation_x1s=None, validation_x2s=None, validation_ys=None):
+              ep_to_stop=10, validation_x1s=None, validation_x2s=None, validation_ys=None):
         input1_ph = tf.placeholder(dtype=tf.float32, shape=(mini_batch_size, self.width, self.height))
         input2_ph = tf.placeholder(dtype=tf.float32, shape=(mini_batch_size, self.width, self.height))
         labels_ph = tf.placeholder(dtype=tf.float32, shape=(mini_batch_size,))
@@ -115,7 +120,7 @@ class Model:
                     sess.run(train_op, feed_dict=feed_dict)
                     # print('Batch {}/{} has been processed'.format(bt_num, num_batches))
 
-                print('Epoch {} training complete'.format(ep))
+                print('Epoch {} training complete\n'.format(ep))
 
                 self._monitor(
                     sess=sess,
@@ -125,7 +130,7 @@ class Model:
                     margin=margin,
                     mini_batch_size=mini_batch_size,
                     embedding_dimension=embedding_dimension,
-                    prefix='Training')
+                    prefix='Training  ')
 
                 self._monitor(
                     sess=sess,
@@ -136,3 +141,7 @@ class Model:
                     mini_batch_size=mini_batch_size,
                     embedding_dimension=embedding_dimension,
                     prefix='Validation')
+
+                if self.eps_no_improvement >= ep_to_stop:
+                    print('Training is finished. Best accuracy: {}'.format(self.best_accuracy))
+                    return
