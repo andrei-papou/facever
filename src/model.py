@@ -1,7 +1,7 @@
 import math
 import tensorflow as tf
 from models.inception import inception
-from models.chopra import chopra
+from models.chopra import chopra, chopra_deep
 from losses.contrastive import contrastive_loss, contrastive_loss_caffe
 from utils import compute_euclidian_distance_square, unison_shuffle, generate_model_id, get_model_file_path
 from data import DataProvider
@@ -104,26 +104,31 @@ class Model:
             self._load_or_initialize(sess)
 
             for ep in range(num_epochs):
-                batches_processed = 0
                 for x1s, x2s, ys in data_provider.batches:
-                    batches_processed += 1
                     feed_dict = {input1_ph: x1s, input2_ph: x2s, labels_ph: ys}
                     sess.run(train_op, feed_dict=feed_dict)
-                    print('batched completed')
 
-                    if batches_processed > 20:
-                        batches_processed = 0
-                        x1s_vld, x2s_vld, ys_vld = data_provider.evaluation_data
-                        self._monitor(
-                            sess=sess,
-                            x1s=x1s_vld,
-                            x2s=x2s_vld,
-                            ys=ys_vld,
-                            margin=margin,
-                            mini_batch_size=mini_batch_size,
-                            embedding_dimension=embedding_dimension,
-                            prefix='Validation')
-                    else:
-                        batches_processed += 1
+                print('Monitor on LFW pairs:')
+                x1s_vld, x2s_vld, ys_vld = data_provider.evaluation_data_lfw_pairs
+                self._monitor(
+                    sess=sess,
+                    x1s=x1s_vld,
+                    x2s=x2s_vld,
+                    ys=ys_vld,
+                    margin=margin,
+                    mini_batch_size=mini_batch_size,
+                    embedding_dimension=embedding_dimension,
+                    prefix='Validation')
 
+                print('Monitor on Olivetti images:')
+                x1s_olv, x2s_olv, ys_olv = data_provider.evaluation_data_olivetti
+                self._monitor(
+                    sess=sess,
+                    x1s=x1s_olv,
+                    x2s=x2s_olv,
+                    ys=ys_olv,
+                    margin=margin,
+                    mini_batch_size=mini_batch_size,
+                    embedding_dimension=embedding_dimension,
+                    prefix='Validation')
                 print('Epoch {} training complete'.format(ep))

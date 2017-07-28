@@ -30,7 +30,7 @@ def main(args):
         num_epochs=2000,
         embedding_dimension=128,
         mini_batch_size=50,
-        learning_rate=0.00035,
+        learning_rate=0.0001,
         margin=0.5)
 
 
