@@ -3,7 +3,7 @@ import argparse
 import numpy as np
 import tensorflow as tf
 from model import Model
-from data import get_data, DataProvider
+from data import DataProvider
 
 
 tf.logging.set_verbosity(tf.logging.INFO)
